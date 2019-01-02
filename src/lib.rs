@@ -85,12 +85,16 @@ where
                 let nodes_size_of_lowest_row = nodes_size - first_index_in_lowest_row;
 
                 // Insert the input into the merkle tree.
-                for i in 0..nodes_size_of_lowest_row {
-                    nodes[first_index_in_lowest_row + i] = input[i].clone()
-                }
-                for i in 0..input_size - nodes_size_of_lowest_row {
-                    nodes[first_input_node_index + i] = input[nodes_size_of_lowest_row + i].clone();
-                }
+                nodes[first_index_in_lowest_row
+                    ..(nodes_size_of_lowest_row + first_index_in_lowest_row)]
+                    .clone_from_slice(&input[..nodes_size_of_lowest_row]);
+
+                nodes[first_input_node_index
+                    ..(input_size - nodes_size_of_lowest_row + first_input_node_index)]
+                    .clone_from_slice(
+                        &input[nodes_size_of_lowest_row
+                            ..(input_size - nodes_size_of_lowest_row + nodes_size_of_lowest_row)],
+                    );
 
                 let max_nodes_size_of_lowest_row = 1 << lowest_row_index;
                 // Calc hash for the lowest row
@@ -146,11 +150,11 @@ impl<T> Proof<T>
 where
     T: Default + Clone + PartialEq,
 {
-    pub fn verify<M>(&self, root: T, data: T, merge: M) -> bool
+    pub fn verify<M>(&self, root: &T, data: T, merge: M) -> bool
     where
         M: Fn(&T, &T) -> T,
     {
-        self.0.iter().fold(data, |h, ref x| {
+        &self.0.iter().fold(data, |h, ref x| {
             if x.is_right {
                 merge(&h, &x.hash)
             } else {
@@ -352,12 +356,11 @@ mod tests {
             let root_hash = tree.get_root_hash().unwrap().clone();
             let input_size = input.len();
             let loop_size = if input_size == 0 { 1 } else { input_size };
-            for index in 0..loop_size {
-                let data_hash = input[index].clone();
+            for (index, item) in input.into_iter().enumerate().take(loop_size) {
                 let proof = tree
                     .get_proof_by_input_index(index)
                     .expect("proof is not none");
-                assert!(proof.verify(root_hash.clone(), data_hash, merge));
+                assert!(proof.verify(&root_hash, item, merge));
             }
         }
     }
