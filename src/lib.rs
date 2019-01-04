@@ -45,15 +45,15 @@ where
 {
     // For example, there is 11 hashes [A..K] are used to generate a merkle tree:
     //
-    //      F_G H_I J_K
-    //       |   |   |
-    //       7___8   9___A   B___C   D___E
-    //         |       |       |       |
-    //         3_______4       5_______6
-    //             |               |
-    //             1_______________2
-    //                     |
     //                     0
+    //                     |
+    //             1---------------2
+    //             |               |
+    //         3-------4       5-------6
+    //         |       |       |       |
+    //       7---8   9---A   B---C   D---E
+    //       |   |   |
+    //      F-G H-I J-K
     //
     // The algorithm is:
     //
