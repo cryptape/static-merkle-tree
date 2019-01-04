@@ -25,7 +25,7 @@ use std::marker::PhantomData;
 #[derive(Debug, Clone)]
 pub struct Tree<T, M> {
     nodes: Vec<T>,
-    input_size: usize,
+    leaf_size: usize,
     phanton: PhantomData<M>,
 }
 
@@ -45,9 +45,9 @@ where
 {
     // For example, there is 11 hashes [A..K] are used to generate a merkle tree:
     //
-    //      A_B C_D E_F
+    //      F_G H_I J_K
     //       |   |   |
-    //       7___8   9___G   H___I   J___K
+    //       7___8   9___A   B___C   D___E
     //         |       |       |       |
     //         3_______4       5_______6
     //             |               |
@@ -58,54 +58,44 @@ where
     // The algorithm is:
     //
     //      1. Create a vec:    [_, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _, _]
-    //      2. Insert A..F:     [_, _, _, _, _, _, _, _, _, _, _, _, _, _, _, A, B, C, D, E, F]
-    //      3. Insert G..K:     [_, _, _, _, _, _, _, _, _, _, G, H, I, J, K, A, B, C, D, E, F]
-    //      4. Update for 7..8: [_, _, _, _, _, _, _, 7, 8, 9, G, H, I, J, K, A, B, C, D, E, F]
-    //      5. Update for 3..6: [_, _, _, 3, 4, 5, 6, 7, 8, 9, G, H, I, J, K, A, B, C, D, E, F]
-    //      6. Update for 1..2: [_, 1, 2, 3, 4, 5, 6, 7, 8, 9, G, H, I, J, K, A, B, C, D, E, F]
-    //      7. Update for 0:    [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, G, H, I, J, K, A, B, C, D, E, F]
+    //      2. Insert A..K:     [_, _, _, _, _, _, _, _, _, _, A, B, C, D, E, F, G, H, I, J, K]
+    //      3. Update for 7..9: [_, _, _, _, _, _, _, 7, 8, 9, A, B, C, D, E, F, G, H, I, J, K]
+    //      4. Update for 3..6: [_, _, _, 3, 4, 5, 6, 7, 8, 9, A, B, C, D, E, F, G, H, I, J, K]
+    //      5. Update for 1..2: [_, 1, 2, 3, 4, 5, 6, 7, 8, 9, A, B, C, D, E, F, G, H, I, J, K]
+    //      6. Update for 0:    [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, A, B, C, D, E, F, G, H, I, J, K]
     pub fn from_hashes(input: Vec<T>, merge: M) -> Self {
-        let input_size = input.len();
+        let leaf_size = input.len();
 
-        let nodes = match input_size {
+        let nodes = match leaf_size {
             0 => vec![],
 
             // If only one input.
             1 => input,
 
             _ => {
-                let nodes_size = get_size_of_nodes(input_size);
-                let mut nodes = vec![T::default(); nodes_size];
+                let nodes_number = get_number_of_nodes(leaf_size);
+                let mut nodes = vec![T::default(); nodes_number];
 
-                let rows_size = get_size_of_rows(input_size);
-                let lowest_row_index = rows_size - 1;
+                let depth = get_depth(leaf_size);
+                let lowest_row_index = depth - 1;
 
-                let first_input_node_index = nodes_size - input_size;
+                let first_input_node_index = nodes_number - leaf_size;
                 let first_index_in_lowest_row = (1 << lowest_row_index) - 1;
-                let nodes_size_of_lowest_row = nodes_size - first_index_in_lowest_row;
+                let nodes_number_of_lowest_row = nodes_number - first_index_in_lowest_row;
 
                 // Insert the input into the merkle tree.
-                nodes[first_index_in_lowest_row
-                    ..(nodes_size_of_lowest_row + first_index_in_lowest_row)]
-                    .clone_from_slice(&input[..nodes_size_of_lowest_row]);
+                nodes[first_input_node_index..nodes_number].clone_from_slice(&input);
 
-                nodes[first_input_node_index
-                    ..(input_size - nodes_size_of_lowest_row + first_input_node_index)]
-                    .clone_from_slice(
-                        &input[nodes_size_of_lowest_row
-                            ..(input_size - nodes_size_of_lowest_row + nodes_size_of_lowest_row)],
-                    );
-
-                let max_nodes_size_of_lowest_row = 1 << lowest_row_index;
+                let max_nodes_number_of_lowest_row = 1 << lowest_row_index;
                 // Calc hash for the lowest row
-                if max_nodes_size_of_lowest_row == input_size {
+                if max_nodes_number_of_lowest_row == leaf_size {
                     // The lowest row is full.
                     calc_tree_at_row(&mut nodes, lowest_row_index, 0, &merge)
                 } else {
                     calc_tree_at_row(
                         &mut nodes,
                         lowest_row_index,
-                        nodes_size_of_lowest_row >> 1,
+                        nodes_number_of_lowest_row >> 1,
                         &merge,
                     );
                 }
@@ -122,7 +112,7 @@ where
 
         Self {
             nodes,
-            input_size,
+            leaf_size,
             phanton: PhantomData,
         }
     }
@@ -132,7 +122,7 @@ where
     }
 
     pub fn get_proof_by_input_index(&self, input_index: usize) -> Option<Proof<T>> {
-        get_proof_indexes(input_index, self.input_size).map(|indexes| {
+        get_proof_indexes(input_index, self.leaf_size).map(|indexes| {
             Proof::<T>(
                 indexes
                     .into_iter()
@@ -185,7 +175,7 @@ where
 }
 
 #[inline]
-fn get_size_of_rows(m: usize) -> usize {
+fn get_depth(m: usize) -> usize {
     let mut x: usize = 1;
     let mut y: usize = 0;
     while x < m {
@@ -196,16 +186,16 @@ fn get_size_of_rows(m: usize) -> usize {
 }
 
 #[inline]
-fn get_size_of_nodes(m: usize) -> usize {
-    // The rows size for m:
-    //      x = get_size_of_rows(m);
+fn get_number_of_nodes(m: usize) -> usize {
+    // The depth for m:
+    //      x = get_depth(m);
     // The second row from the bottom (math index):
     //      y = x - 1;
-    // Size of nodes for the second row from the bottom:
+    // Number of nodes for the second row from the bottom:
     //      z = 2 ^ (y - 1);
-    // Size of nodes above the lowest row:
+    // Number of nodes above the lowest row:
     //      n1 = 2 ^ y - 1;
-    // Size of nodes in the lowest row:
+    // Number of nodes in the lowest row:
     //      n2 = (m - z) * 2;
     // Returns:
     //      n1 + n2
@@ -230,22 +220,13 @@ fn get_index_of_brother_and_father(index: usize) -> (usize, usize) {
 }
 
 #[inline]
-fn get_proof_indexes(input_index: usize, input_size: usize) -> Option<Vec<usize>> {
-    if input_index == 0 && input_size < 2 {
+fn get_proof_indexes(input_index: usize, leaf_size: usize) -> Option<Vec<usize>> {
+    if input_index == 0 && leaf_size < 2 {
         Some(vec![])
-    } else if input_size != 0 && input_index < input_size {
+    } else if leaf_size != 0 && input_index < leaf_size {
         let mut ret = Vec::new();
-        let nodes_size = get_size_of_nodes(input_size);
-        let rows_size = get_size_of_rows(input_size);
-        let lowest_row_index = rows_size - 1;
-        let first_input_node_index = nodes_size - input_size;
-        let first_index_in_lowest_row = (1 << lowest_row_index) - 1;
-        let nodes_size_of_lowest_row = nodes_size - first_index_in_lowest_row;
-        let mut index = if input_index + 1 > nodes_size_of_lowest_row {
-            first_input_node_index + (input_index - nodes_size_of_lowest_row)
-        } else {
-            first_index_in_lowest_row + input_index
-        };
+        let nodes_number = get_number_of_nodes(leaf_size);
+        let mut index = nodes_number - leaf_size + input_index;
         while index > 0 {
             let (brother_index, parent_index) = get_index_of_brother_and_father(index);
             ret.push(brother_index);
@@ -270,7 +251,7 @@ mod tests {
     }
 
     #[test]
-    fn test_size_of_rows() {
+    fn test_depth() {
         let check = vec![
             (0, 1),
             (1, 1),
@@ -284,12 +265,12 @@ mod tests {
             (17, 6),
         ];
         for (x, y) in check {
-            assert_eq!(y, super::get_size_of_rows(x));
+            assert_eq!(y, super::get_depth(x));
         }
     }
 
     #[test]
-    fn test_size_of_nodes() {
+    fn test_number_of_nodes() {
         let check = vec![
             (0, 1),
             (1, 1),
@@ -303,7 +284,7 @@ mod tests {
             (20, 39),
         ];
         for (x, y) in check {
-            assert_eq!(y, super::get_size_of_nodes(x));
+            assert_eq!(y, super::get_number_of_nodes(x));
         }
     }
 
@@ -333,12 +314,10 @@ mod tests {
             ((2, 2), None),
             ((0, 0), Some(vec![])),
             ((0, 1), Some(vec![])),
-            ((0, 20), Some(vec![32, 16, 8, 4, 2])),
-            ((11, 20), Some(vec![21, 9, 3, 2])),
-            ((15, 20), Some(vec![25, 11, 6, 1])),
-            ((0, 19), Some(vec![32, 16, 8, 4, 2])),
-            ((11, 19), Some(vec![24, 12, 6, 1])),
-            ((15, 19), Some(vec![28, 14, 5, 1])),
+            ((0, 11), Some(vec![9, 3, 2])),
+            ((10, 11), Some(vec![19, 10, 3, 2])),
+            ((9, 11), Some(vec![20, 10, 3, 2])),
+            ((8, 11), Some(vec![17, 7, 4, 2])),
         ];
         for ((x1, x2), y) in check {
             assert_eq!(y, super::get_proof_indexes(x1, x2));
@@ -354,8 +333,8 @@ mod tests {
         for input in inputs {
             let tree = super::Tree::from_hashes(input.clone(), merge);
             let root_hash = tree.get_root_hash().unwrap().clone();
-            let input_size = input.len();
-            let loop_size = if input_size == 0 { 1 } else { input_size };
+            let leaf_size = input.len();
+            let loop_size = if leaf_size == 0 { 1 } else { leaf_size };
             for (index, item) in input.into_iter().enumerate().take(loop_size) {
                 let proof = tree
                     .get_proof_by_input_index(index)
@@ -367,9 +346,32 @@ mod tests {
 
     #[test]
     fn test_root() {
-        let inputs = (0u32..12u32).map(|i| Node(vec![i])).collect();
-        let tree = super::Tree::from_hashes(inputs, merge);
+        assert_root(&(0u32..12u32).collect::<Vec<u32>>());
+        assert_root(&(0u32..11u32).collect::<Vec<u32>>());
+        assert_root(&[1u32, 5u32, 100u32, 4u32, 7u32, 9u32, 11u32]);
+        assert_root(&(0u32..27u32).collect::<Vec<u32>>());
+    }
+
+    fn assert_root(raw: &[u32]) {
+        let leaves: Vec<Node> = raw.iter().map(|i| Node(vec![*i])).collect();
+        let leaves_len = leaves.len();
+        let tree = super::Tree::from_hashes(leaves, merge);
         let root = tree.get_root_hash().unwrap();
-        assert_eq!(root, &Node((0u32..12u32).collect::<Vec<u32>>()));
+        let depth = super::get_depth(leaves_len);
+        let nodes_number = super::get_number_of_nodes(leaves_len);
+        let last_row_number = nodes_number - (2usize.pow(depth as u32 - 1)) + 1;
+        let first_part_index = leaves_len - last_row_number;
+        let mut first_part = raw[first_part_index..leaves_len]
+            .iter()
+            .cloned()
+            .map(|i| i)
+            .collect::<Vec<u32>>();
+        let second_part = raw[0..first_part_index]
+            .iter()
+            .cloned()
+            .map(|i| i)
+            .collect::<Vec<u32>>();
+        first_part.extend_from_slice(&second_part);
+        assert_eq!(root, &Node(first_part));
     }
 }
