@@ -77,32 +77,26 @@ where
                 let mut nodes = vec![T::default(); nodes_number];
 
                 let depth = get_depth(leaf_size);
-                let lowest_row_index = depth - 1;
 
                 let first_input_node_index = nodes_number - leaf_size;
-                let first_index_in_lowest_row = (1 << lowest_row_index) - 1;
+                let first_index_in_lowest_row = (1 << depth) - 1;
                 let nodes_number_of_lowest_row = nodes_number - first_index_in_lowest_row;
 
                 // Insert the input into the merkle tree.
                 nodes[first_input_node_index..nodes_number].clone_from_slice(&input);
 
-                let max_nodes_number_of_lowest_row = 1 << lowest_row_index;
+                let max_nodes_number_of_lowest_row = 1 << depth;
                 // Calc hash for the lowest row
                 if max_nodes_number_of_lowest_row == leaf_size {
                     // The lowest row is full.
-                    calc_tree_at_row(&mut nodes, lowest_row_index, 0, &merge)
+                    calc_tree_at_row(&mut nodes, depth, 0, &merge)
                 } else {
-                    calc_tree_at_row(
-                        &mut nodes,
-                        lowest_row_index,
-                        nodes_number_of_lowest_row >> 1,
-                        &merge,
-                    );
+                    calc_tree_at_row(&mut nodes, depth, nodes_number_of_lowest_row >> 1, &merge);
                 }
 
                 // From the second row from the bottom to the second row from the top.
-                for i in 1..lowest_row_index {
-                    let row_index = lowest_row_index - i;
+                for i in 1..depth {
+                    let row_index = depth - i;
                     calc_tree_at_row(&mut nodes, row_index, 0, &merge);
                 }
 
@@ -182,15 +176,15 @@ fn get_depth(m: usize) -> usize {
         x <<= 1;
         y += 1;
     }
-    y + 1
+    y
 }
 
 #[inline]
 fn get_number_of_nodes(m: usize) -> usize {
     // The depth for m:
-    //      x = get_depth(m);
+    //      depth = get_depth(m);
     // The second row from the bottom (math index):
-    //      y = x - 1;
+    //      y = depth;
     // Number of nodes for the second row from the bottom:
     //      z = 2 ^ (y - 1);
     // Number of nodes above the lowest row:
@@ -253,16 +247,16 @@ mod tests {
     #[test]
     fn test_depth() {
         let check = vec![
-            (0, 1),
-            (1, 1),
-            (2, 2),
-            (3, 3),
-            (4, 3),
-            (5, 4),
-            (8, 4),
-            (9, 5),
-            (16, 5),
-            (17, 6),
+            (0, 0),
+            (1, 0),
+            (2, 1),
+            (3, 2),
+            (4, 2),
+            (5, 3),
+            (8, 3),
+            (9, 4),
+            (16, 4),
+            (17, 5),
         ];
         for (x, y) in check {
             assert_eq!(y, super::get_depth(x));
@@ -359,7 +353,7 @@ mod tests {
         let root = tree.get_root_hash().unwrap();
         let depth = super::get_depth(leaves_len);
         let nodes_number = super::get_number_of_nodes(leaves_len);
-        let last_row_number = nodes_number - (2usize.pow(depth as u32 - 1)) + 1;
+        let last_row_number = nodes_number - 2usize.pow(depth as u32) + 1;
         let first_part_index = leaves_len - last_row_number;
         let mut first_part = raw[first_part_index..leaves_len]
             .iter()
