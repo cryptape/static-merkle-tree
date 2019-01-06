@@ -2,3 +2,8 @@
 name = "static_merkle_tree"
 version = "0.1.1"
 authors = ["Cryptape Technologies <contact@cryptape.com>"]
+description = "Static Merkle Tree is dedicated for generating Merkle Root and Merkle Proof for a static list of items."
+license = "MIT"
+repository = "https://github.com/cryptape/static-merkle-tree"
+keywords = ["merkle", "tree", "static"]
+categories = ["algorithms", "data-structures"]
