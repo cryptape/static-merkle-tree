@@ -1,13 +1,13 @@
 [package]
-name = "static_merkel_tree"
+name = "static_merkle_tree"
 version = "1.0.0"
 authors = ["Cryptape Technologies <contact@cryptape.com>"]
-description = "Static Merkel Tree is dedicated for generating Merkle Root and Merkle Proof for a static list of items."
+description = "Static Merkle Tree is dedicated for generating Merkle Root and Merkle Proof for a static list of items."
 license = "MIT"
-repository = "https://github.com/cryptape/static-merkel-tree"
-keywords = ["merkel", "tree", "static"]
+repository = "https://github.com/cryptape/static-merkle-tree"
+keywords = ["merkle", "tree", "static"]
 categories = ["algorithms", "data-structures"]
 
 [badges]
-travis-ci = { repository = "cryptape/static-merkel-tree" }
+travis-ci = { repository = "cryptape/static-merkle-tree" }
 maintenance = { status = "actively-developed" }
