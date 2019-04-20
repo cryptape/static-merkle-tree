@@ -3,13 +3,11 @@
 //! This module should be used to generate complete merkle tree root hash.
 
 use std::cmp::PartialEq;
-use std::marker::PhantomData;
 
 #[derive(Debug, Clone)]
-pub struct Tree<T, M> {
+pub struct Tree<T> {
     nodes: Vec<T>,
     leaf_size: usize,
-    phanton: PhantomData<M>,
 }
 
 #[derive(Debug, Clone)]
@@ -21,10 +19,9 @@ pub struct ProofNode<T> {
 #[derive(Debug, Clone)]
 pub struct Proof<T>(pub Vec<ProofNode<T>>);
 
-impl<T, M> Tree<T, M>
+impl<T> Tree<T>
 where
     T: Default + Clone + PartialEq,
-    M: Fn(&T, &T) -> T,
 {
     // For example, there is 11 hashes [A..K] are used to generate a merkle tree:
     //
@@ -46,7 +43,10 @@ where
     //      4. Update for 3..6: [_, _, _, 3, 4, 5, 6, 7, 8, 9, A, B, C, D, E, F, G, H, I, J, K]
     //      5. Update for 1..2: [_, 1, 2, 3, 4, 5, 6, 7, 8, 9, A, B, C, D, E, F, G, H, I, J, K]
     //      6. Update for 0:    [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, A, B, C, D, E, F, G, H, I, J, K]
-    pub fn from_hashes(input: Vec<T>, merge: M) -> Self {
+    pub fn from_hashes<M>(input: Vec<T>, merge: M) -> Self
+    where
+        M: Fn(&T, &T) -> T,
+    {
         let leaf_size = input.len();
 
         let nodes = match leaf_size {
@@ -87,11 +87,7 @@ where
             }
         };
 
-        Self {
-            nodes,
-            leaf_size,
-            phanton: PhantomData,
-        }
+        Self { nodes, leaf_size }
     }
 
     pub fn get_root_hash(&self) -> Option<&T> {
